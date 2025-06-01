@@ -457,6 +457,31 @@ mpl_load
 .sample_upload_byte_next
 	
 	dbra d1,.sample_upload_byte_loop
+	
+	;; if the loop part of the sample would still fit in the current page,
+	;; upload it again. this helps very short looped samples sound less off-tune
+	move.w mpl_sample_loop_addr(a2),d7 ;pre-loop length in d7
+	sub.w mpl_sample_addr(a2),d7
+	
+	move.l mpl_sample_size(a2),d1 ;loop length in d1
+	sub.w d7,d1
+	beq .sample_upload_done ;no loop
+	
+	move.w d2,d7 ;bytes left in page in d7 (note we do still need an extra byte for the stop-byte, hence "not" instead of "neg")
+	lsr.w #1,d7
+	and.w #$ff,d7
+	not.b d7
+	beq .sample_upload_done ;no bytes free
+	cmp.w d7,d1
+	bhi .sample_upload_done ;not enough bytes free
+	
+	suba.w d1,a5 ;ok, we can continue uploading
+	subq.w #1,d1
+	bra .sample_upload_byte_loop
+	
+	;; done
+	
+.sample_upload_done
 	st (a4,d2) ;stop-byte
 	
 .sample_upload_next
