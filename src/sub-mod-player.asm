@@ -1391,7 +1391,6 @@ mpl_run_tick
 	cmp.b mpl_speed_cnt(a6),d0
 	bne .eff_no_note_cut
 	lea mpl_chn_volume(a5),a0
-	clr.b (a0)+
 	clr.b (a0)
 .eff_no_note_cut
 	rts
