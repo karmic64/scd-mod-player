@@ -87,7 +87,6 @@ mode_mod_visualizer_init
 mode_mod_visualizer
 	btst.b #6,joy ;return to menu with A
 	beq .no_return
-	sf fch_render_mode
 	move.l #mode_file_chooser_init,mode_ptr
 .no_return
 	
