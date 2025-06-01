@@ -273,6 +273,7 @@ render_pattern
 	moveq #CMD_M_GET_PATTERN,d0 ;tell the sub-cpu to start fetching pattern
 	bsr send_command
 	
+.rerender_pattern
 	move.w #-MVL_PATTERN_SCROLL_OFFSET*8,vscroll_a ;scroll back to top
 	
 	move.b d7,d0 ;get current top row
@@ -317,7 +318,10 @@ render_pattern
 	;;;; draw main pattern
 .rerender_pattern_main
 	
+	btst.b #COMM_REQ,main_flug
+	beq .no_wait_command
 	bsr wait_command ;ok, now we need the sub-cpu to have finished
+.no_wait_command
 	
 	move.b mvl_current_top_row(pc),d0
 	
@@ -347,9 +351,9 @@ render_pattern
 	move.b d4,d2
 .got_max_rerender_rows
 	
-	bsr mvl_make_pattern_dma_list
+	bra mvl_make_pattern_dma_list
 	
-	bra .done_pattern
+	
 	
 	
 	;;;;;;;;;; not rerendering, just see how much we need to scroll
@@ -371,6 +375,9 @@ render_pattern
 	
 	;;;;;; scroll up
 .scroll_pattern_up
+	cmp.b #-MVL_PATTERN_HEIGHT,d2 ;if scrolling further than the full size just rerender
+	ble .rerender_pattern
+	
 	move.b d2,d3 ;update the vscroll
 	ext.w d3
 	asl.w #3,d3
@@ -422,6 +429,9 @@ render_pattern
 	
 	;;;;;; scroll down
 .scroll_pattern_down
+	cmp.b #MVL_PATTERN_HEIGHT,d2 ;if scrolling further than the full size just rerender
+	bge .rerender_pattern
+	
 	move.w (a0),d3 ;get the first screen row
 	asr.w #3,d3
 	add.w #MVL_PATTERN_SCROLL_OFFSET,d3
