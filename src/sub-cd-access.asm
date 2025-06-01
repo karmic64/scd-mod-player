@@ -211,6 +211,22 @@ cda_read_root_directory
 	
 	;;;;;;;;;;;;;;;;;; index dir files
 	
+	;;;;;; get length of copyright/abstract/bibliographic filenames
+	
+	lea pvd_copyright(a6),a0
+	bsr .get_pvd_filename_length
+	move.b d0,.copyright_len+1
+	
+	lea pvd_abstract(a6),a0
+	bsr .get_pvd_filename_length
+	move.b d0,.abstract_len+1
+	
+	lea pvd_bibliographic(a6),a0
+	bsr .get_pvd_filename_length
+	move.b d0,.bibliographic_len+1
+	
+	;;;;;;; main
+	
 	lea w_cda_dir_index,a4
 	moveq #0,d7 ;current dir index
 	moveq #0,d6 ;current number of files
@@ -220,13 +236,48 @@ cda_read_root_directory
 	cmp.l d5,d7 ;read all?
 	bhs .index_dir_done
 	
-	lea (a5,d7.l),a0 ;get current record pointer
+	lea (a5,d7.l),a3 ;get current record pointer
 	
-	move.b de_length(a0),d0 ;length is 0, assuming next entry can't fit in this sector
+	move.b de_length(a3),d0 ;length is 0, assuming next entry can't fit in this sector
 	beq .index_dir_next_sector
 	
-	btst.b #1,de_flags(a0) ;we don't care about directories
+	btst.b #1,de_flags(a3) ;we don't care about directories
 	bne .index_dir_next
+	
+	lea de_name(a3),a0 ;exclude copyright/abstract/bibliographic files
+	moveq #';',d3
+	
+	moveq #0,d2
+	move.b -1(a0),d2
+	subq.b #1,d2
+.cd_fn_loop
+	cmp.b (a0,d2.w),d3
+	beq .got_cd_filename_length
+	subq.b #1,d2
+	bne .cd_fn_loop
+	move.b -1(a0),d2 ;can't find version separator, just reload default
+.got_cd_filename_length
+	
+	lea de_name(a3),a0
+	lea pvd_copyright(a6),a1
+.copyright_len
+	moveq #0,d1
+	bsr .compare_filenames
+	beq .index_dir_next
+	
+	lea de_name(a3),a0
+	lea pvd_abstract(a6),a1
+.abstract_len
+	moveq #0,d1
+	bsr .compare_filenames
+	beq .index_dir_next
+	
+	lea de_name(a3),a0
+	lea pvd_bibliographic(a6),a1
+.bibliographic_len
+	moveq #0,d1
+	bsr .compare_filenames
+	beq .index_dir_next
 	
 	cmp.l #CDA_MAX_FILES,d6 ;too many files?
 	bhi cda_too_many_files
@@ -255,6 +306,45 @@ cda_read_root_directory
 	rts
 	
 	
+	; filename in a0, returns length in d0
+.get_pvd_filename_length
+	moveq #36,d0
+	moveq #' ',d1
+.gpfl_loop
+	cmp.b (a0,d0.w),d1
+	bne .gpfl_got
+	subq.b #1,d0
+	bpl .gpfl_loop
+	
+.gpfl_got
+	addq.b #1,d0
+	rts
+	
+	
+	
+	; cd-filename in a0 length in d2
+	; pvd filename in a1, length in d1
+.compare_filenames
+	tst.b d1 ;no filename, quit early
+	beq .fn_cmp_exit_no_match
+	
+	cmp.b d1,d2 ;if it's not the same length, then it's not the same name
+	bne .fn_cmp_exit
+	
+	moveq #0,d1
+.fn_cmp_loop
+	cmp.b (a0)+,(a1)+
+	bne .fn_cmp_exit
+	addq.b #1,d1
+	cmp.b d2,d1
+	blo .fn_cmp_loop
+	
+.fn_cmp_exit
+	rts
+	
+.fn_cmp_exit_no_match
+	and #~4,ccr
+	rts
 	
 	
 	
